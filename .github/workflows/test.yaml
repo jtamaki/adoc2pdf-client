@@ -9,5 +9,5 @@ jobs:
       - uses: jtamaki/adoc2pdf@main
         with:
           input_dir: '.' #'doc'
-          output_dir: ${{ runner.temp }}
+          output_dir: 'C:\temp' #${{ runner.temp }}
       - run: ls ${{ runner.temp }}
