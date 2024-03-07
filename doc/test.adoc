@@ -1,0 +1,265 @@
+:lang: ja
+:doctype: book
+:toc: macro
+:toc-title: 目次
+:sectnums:
+:sectnumlevels: 3
+:sectlinks:
+:icons: font
+:chapter-signifier:
+:example-caption!:
+:table-caption!:
+:figure-caption!:
+
+= Asciidoc to PDF: AsciidocのPDF変換
+:approver:
+:reviewer:
+:author:
+:revision: #x.x#
+:software-component: #aaaa#
+:software-component-group: #bbbb#
+:development-team: #cccc#
+:project: #dddd#
+
+*Revision history / 改訂履歴*
+
+[options="header", cols="1, 1, 3, 1"]
+|===
+| Revision | Released on | Description | Author
+| #1.0# | #YYYY/MM/DD# | |
+||||
+||||
+||||
+||||
+||||
+||||
+|===
+
+<<<
+
+// Table of Contents
+toc::[]
+
+<<<
+
+== Setup / 設定
+
+=== Install Tools / ツールのインストール
+
+==== WindowsにRubyをインストールする
+
+https://rubyinstaller.org/downloads/ からインストーラをダウンロードしてインストールする。
+
+==== asciidoctor, asciidoctor-pdfをインストールする
+
+gemでasciidoctor, asciidoctor-pdfをインストールする。
+
+[]
+----
+gem install asciidoctor
+gem install asciidoctor-pdf
+----
+
+==== テストに使ったツールのバージョン
+
+[]
+----
+>Ruby --version
+ruby 3.2.3 (2024-01-18 revision 52bb2ac0a6) [x64-mingw-ucrt]
+
+>gem list asciidoctor
+
+*** LOCAL GEMS ***
+
+asciidoctor (2.0.20)
+asciidoctor-pdf (2.3.13)
+----
+
+開発で運用する場合Gemfileを使ってバージョンを固定するのが望ましい。
+
+
+== Style / ドキュメントのスタイル
+
+=== テーマファイル
+
+https://itcweb.cc.affrc.go.jp/affrit/documents/guide/asciidoc/start["AsciiDoc文書作成入門::Asciidocによる文書作成環境の構築"] の "仕様書作成等に向いたスタイル" を参考にPDFファイルのスタイルを変更するためのテーマファイルを作成した。
+
+.specification-theme.yml
+[source, yaml]
+----
+extends: default-with-font-fallbacks
+page:
+  margin: [0.9in, 0.9in, 0.9in, 0.9in]
+base:
+  align: left
+  font_color: 000000
+  font_family: Noto Serif
+  line_height_length: 15.5
+  line_height: $base_line_height_length / $base_font_size
+code:
+  font-size: $base_font_size * 0.9
+caption:
+  align: center
+heading:
+  chapter:
+    break-before: auto
+  font_family: $base_font_family
+  font_style: bold
+  font_color: 000000
+  h1_font_size: floor($base_font_size * 1.4)
+  h2_font_size: floor($base_font_size * 1.2)
+  h3_font_size: round($base_font_size * 1.1)
+  h4_font_size: $base_font_size
+  h5_font_size: $base_font_size
+  h6_font_size: $base_font_size
+table:
+  head:
+    font_color: $base_font_color
+    background_color: [185,174,166]
+  foot:
+    background_color: [185,174,166]
+  cell_padding: [3, 3, 3, 3]
+header:
+  border-color: #aaaaaa
+  border-style: double
+  border-width: 0.25
+  height: $base-line-height-length * 2.8
+  vertical-align: bottom
+  padding: [$base-line-height-length / 5, 3, 5, 3]
+  recto:
+    left:
+      content: ~
+    center:
+      content: ~
+    right:
+      content: image:protected_seal.png[]
+  verso:
+    left:
+      content: ~
+    center:
+      content: ~
+    right:
+      content: image:protected_seal.png[]
+footer:
+  border-color: #aaaaaa
+  border-style: double
+  border-width: 0.25
+  recto:
+    left:
+      content: ~  
+    center:
+      content: '{page-number} / {page-count}'
+    right:
+      content: '&#169; Toyota Motor Corporation'
+  verso:
+    left:
+      content: ~  
+    center:
+      content: '{page-number} / {page-count}'
+    right:
+      content: '&#169; Toyota Motor Corporation'
+----
+
+
+=== 表紙の変更
+
+asciidoctor-pdf の https://docs.asciidoctor.org/pdf-converter/latest/extend/[Extend the PDF Converter] 機能を使って表紙のレイアウトを変更した。
+
+.pdf-converter-custom-title-page.rb
+[source, ruby]
+----
+class PDFConverterCustomTitlePage < (Asciidoctor::Converter.for 'pdf')
+  register_for 'pdf'
+  
+  def ink_title_page doc
+    table_data = [
+      ['承認', '調査', '担当'],
+      [doc.attributes['approver'], doc.attributes['reviewer'], doc.attributes['author']]
+    ]
+    table(table_data, header: true, :position => :right, :width => 150) do
+      columns(0..-1).align = :center
+      rows(1).height = 50
+      rows(1).style :valign => :center
+    end
+
+    move_cursor_to page_height * 0.6
+    theme_font :title_page do
+      doctitle = doc.doctitle partition: true
+      theme_font :title_page_title do
+        ink_prose doctitle.main, align: :center, margin: 0
+      end
+      if doctitle.subtitle?
+        theme_font :title_page_subtitle do
+          ink_prose doctitle.subtitle, align: :center, margin: 0
+        end
+      end
+      if !doc.attributes['revision'].nil?
+        theme_font :title_page_revision do
+          ink_prose "Revision : #{doc.attributes['revision']}", align: :center
+        end
+      end
+    end
+
+    move_down 50
+    table_data = [
+      ['Software Component', ':', doc.attributes['software-component']],
+      ['Software Component Group', ':', doc.attributes['software-component-group']],
+      ['Development team', ':', doc.attributes['development-team']],
+      ['Project', ':', doc.attributes['project']]
+    ]
+    table(table_data, :position => :center) do
+      columns(0..-1).align = :left
+      columns(0..-1).borders = []
+    end
+  end
+end
+----
+
+asciidocには以下のようにアトリビュートを埋め込む。
+
+[]
+----
+= タイトル: サブタイトル
+:approver: "承認" 者名
+:reviewer: "調査" 者名
+:author: "担当" 者名
+:revision: #x.x#
+:software-component: #aaaa#
+:software-component-group: #bbbb#
+:development-team: #cccc#
+:project: #dddd#
+----
+
+
+== Usage / 使用方法
+
+[]
+----
+>asciidoctor-pdf ^
+  -a pdf-theme=specification -a pdf-themesdir=theme ^
+  -a scripts=cjk ^
+  -r ./theme/pdf-converter-custom-title-page.rb ^
+  {filename}.adoc
+----
+
+== Samples / サンプル
+
+=== テーブル
+.caption
+|===
+| col | col | col
+| aaa | aaa | aaa
+| bbb | bbb | bbb
+|===
+
+.caption
+|===
+| col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col | col
+| aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa | aaa
+| bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb | bbb
+|===
+
+=== 画像
+
+.caption
+image::image/kitten.jpg[]
